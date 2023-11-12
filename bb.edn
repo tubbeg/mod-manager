@@ -2,11 +2,7 @@
 
 {:paths ["src"]
  :deps {medley/medley {:mvn/version "1.3.0"}}
- :min-bb-version "0.3.7" 
-:tasks
- {:init (shell "unshare -rfm")
-  :requires ([app.manager :refer [testUnshare]])
-  mm (testUnshare)}}
+ :min-bb-version "0.3.7" }
 
 
 

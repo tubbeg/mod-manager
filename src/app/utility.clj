@@ -1,33 +1,40 @@
 (ns app.utility
-  (:require
-  [babashka.process :refer [shell process exec]]))
+  (:require 
+   [babashka.process :refer [shell process exec]] 
+   [clojure.java.io :as io]  
+   [clojure.string :as s]))
+ 
 
-(def example "mount -t overlay myModManagerOverlay -o lowerdir=myLower,upperdir=myUpper,workdir=myWork myMerge")
+(defn directoryExists [path]
+  ;(println "checking directory: " path)
+  (.isDirectory (io/file path))) 
 
-
-(defn ls-and-grep [search]
- (-> (process "ls")
-     (process {:out :string} "grep" search) deref :out))
-
-(defn overlayCmd [name lower upper work merge]
-  ; s = shell
-  ;s(println "shell is" s)
-  (let [mystring (str
-                  "mount -t overlay "
-                  name
-                  " -o "
-                  "lowerdir=" lower
-                  ","
-                  "upperdir=" upper
-                  ","
-                  "workdir=" work
-                  " "  merge)]
-    (println "cmd is " mystring)
+ (defn ls-and-grep [search]
+  (-> (process "ls")
+      (process {:out :string} "grep" search)
+      deref :out))
+ 
+ ; note! this will replace any file!!
+ (defn extract [file dir]
+   (if (directoryExists dir)
     (try
-      (shell example)
-      (catch Exception e
-        (println "exception: " e)))
-    ))
+     (shell "7za" "x" "-y" (str "-o" dir) file)
+     (catch Exception e
+       (println "Failure! Exception: " e)))
+     (println "missing directory!")))
+
+ (defn readFile [file]
+   (slurp file))
+
+ ;note: overwrites any contents
+ (defn writeToFile [contents filepath]
+   (spit filepath contents))
+
+(defn rsyncDirCmd [from to]
+  (shell "rsync" "-a" from to))
+
+(defn cpCmd [from to]
+  (shell "cp" from to))
 
 (defn mkdirCmd [path]
   (shell "mkdir -p " path))
@@ -40,3 +47,10 @@
 
 (defn unmountCmd [dir]
   (shell "unmount " dir))
+
+
+; this does not cover all cases
+(defn removeFileExtension [s] 
+  (first (s/split s #"\.")))
+
+
