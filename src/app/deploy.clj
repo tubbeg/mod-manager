@@ -80,21 +80,17 @@
               :priority priority
               :full-path file}))
 
-(defn addNonConflictFiles [mod-files prio mod-path listOfFiles]
-  (when (notZero mod-files) 
-    (loop [mf mod-files 
+(defn addNonConflictFiles [mod-files prio mod-path listOfFiles] 
+  (when (notZero mod-files)  
+    (loop [mf mod-files  
            lof listOfFiles] 
-      (let [file (first mf) 
-            rem (next mf)
-            l (addEntryToDeployList lof mod-path file prio)
-            hasConf (hasConflict file mod-path listOfFiles)]
-        (cond 
-          (and (not hasConf) (notZero rem)) (do
-                                              ;(println "No conflict" file)
-                                              (recur rem l))
-          (and hasConf (notZero rem)) (do
-                                        ;(println "File has conflict" file)
-                                       (recur rem lof))
+      (let [file (first mf)  
+            rem (next mf) 
+            l (addEntryToDeployList lof mod-path file prio)  
+            hasConf (hasConflict file mod-path listOfFiles)] 
+        (cond  
+          (and (not hasConf) (notZero rem)) (recur rem l)
+          (and hasConf (notZero rem))  (recur rem lof)
           (and (not hasConf) (isZero rem)) l
           :else lof)))))
 
@@ -103,9 +99,6 @@
                :mods 
                :entries 
                (sort-by :priority))]
-    ;1. list all files in mod
-    ;2. compare to existing files (without prefix)
-    ;(println "entires are" e)
     (loop [entries e
            allModFiles []]
       (let [mod (first entries)
@@ -130,15 +123,9 @@
   (if (not (directoryExists config-dir))
     (println "Error! Missing config directory!")
     (let [config (readFromConfig config-dir config-file)
-          game-dir (:game-path config)
           deployList (createDeployList config)] 
-      ;(println "Deploy list is: " deployList)
-      ;(println "ordered deploy list" (sort-by :priority deployList))
-      
       (if (isZero deployList)
         (println "Error! No mods to deploy!")
-        ; 1. create list of mod file paths to deploy
-        ; 2. copy each file
         (loop [e (sort-by :priority deployList)
                updatedDeploy []]
           (let [m (first e)

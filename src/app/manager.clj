@@ -32,7 +32,7 @@
 (def defaultConfigDir ".mm")
 (def defaultConfigFile ".mm/config.edn")
 (def defaultModFolder ".mm/mods")
-(def defaultExtension ".mm")
+;(def defaultExtension ".mm")
 (def defaultSourceDirectory ".mm/source")
 (def defaultDeployPath ".mm/deploy.edn")
 
@@ -142,11 +142,6 @@
     (println "comparing: " to from)
     (println (compareFiles from to))))
 
-
-
-
-
-
 (defn cleanDir []
   (println "You are about to delete your mod directory!")
   (println "Create BACKUP of any files you might need!")
@@ -165,10 +160,6 @@
           entry 
           %)
        coll))
-
-(defn enableMod [i]
-  (let [c (readDefaultConfig)]
-    ))
 
 (defn get-mod [mod-name config]
   (let [entries (-> config
@@ -267,7 +258,6 @@
    (= (first (:args i)) "compare") (compFiles i)
    (= (:args i) ["clean"]) (cleanDir)
    (= (first (:args i)) "set-mod") (changeModEntry i)
-   (= (first (:args i)) ["set-priority"]) (println "not yet implemented")
    (= (:args i) ["deploy"]) (deployMods 
                              defaultConfigDir
                              defaultConfigFile

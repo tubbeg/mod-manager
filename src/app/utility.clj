@@ -42,7 +42,6 @@
 (def test ".mm/mods/modFolder1/file1.txt")
 (def p1 ".mm/mods/modFolder1")
 (def p2 "gameFolder/")
-(switchPrefix test p2 p1 false true)
 
 (defn notZero [coll]
   (> (count coll) 0))
@@ -132,13 +131,9 @@
  
 (defn collHasPath [path coll]
   (let [res (filter (fn [e] (= e path)) coll)]
-    ;(println "finding" path "in" coll)
-    ;(println "res is" res)
     res))
  
 (defn compareFiles [from to]
-  ;(println "destination is" to)
-  ;(println "source is " from)
   (if (notZero from)
    (loop [f from
           common []]
@@ -147,7 +142,6 @@
           hasRemainder (notZero rem)
           matches (collHasPath _first to)
           hasMatch (notZero matches)]
-      ;(println "has match is" hasMatch "file: " _first)
       (cond
         (and hasRemainder hasMatch) (recur rem (conj common _first))
         hasRemainder (recur rem common)
@@ -210,7 +204,6 @@
                  true)]
     (when (and (not replace) (fileExists moveFrom)) 
       (do 
-        ;(println "prefix switch source is" srcDest)
         (println "Moving file: " moveFrom "to" srcDest) 
         (rsyncCreateMissingDirectories moveFrom srcDest))) 
     (println "Copying" file "to" moveFrom) 
@@ -221,7 +214,6 @@
   (println "Not yet implemented!"))
 
 (defn removeFileExtension [s]
-  ;(println "removing extension on: " s)
   (let [index (s/last-index-of s ".")
         regex (-> (str ".{" index "}"))]
     (if (= index nil)
