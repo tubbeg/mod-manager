@@ -239,37 +239,31 @@
           (println (str "\n" "Done..."))
           (recur rem))))))
 
+
+(defn firstArg [i match]
+  (= (s/trim (first (:args i))) match))
+
 (defn filterInput [i]
  (cond 
-   (= (:args i) ["help"]) (println "not yet implemented!")
-   (= (:args i) ["status"]) (printStatus) 
-   (= (first (:args i)) "init") (initialize
+   (firstArg i "help") (println "not yet implemented!")
+   (firstArg i "status") (printStatus) 
+   (firstArg i "init") (initialize
                                  i
                                  defaultConfigFile
                                  defaultConfigDir
                                  defaultSourceDirectory
                                  defaultModFolder) 
-   (= (first (:args i)) "install") (install i)
-   (= (:args i) ["restore"]) (restoreFiles (readDefaultConfig))
-   (= (:args i) ["purge"]) (purgeAllModFiles
+   (firstArg i "install") (install i)
+   (firstArg i "restore") (restoreFiles (readDefaultConfig))
+   (firstArg i "purge") (purgeAllModFiles
                             defaultConfigDir
                             defaultDeployPath)
-   (= (:args i) ["list-mod"]) (listAllMods true (readDefaultConfig))
-   (= (first (:args i)) "compare") (compFiles i)
-   (= (:args i) ["clean"]) (cleanDir)
-   (= (first (:args i)) "test") (println (next (:args i)))
-   (= (first (:args i)) "set-mod") (changeModEntry i)
-   (= (:args i) ["deploy"]) (deployMods 
+   (firstArg i "clean") (cleanDir) 
+   (firstArg i "set-mod") (changeModEntry i)
+   (firstArg i "deploy") (deployMods 
                              defaultConfigDir
                              defaultConfigFile
                              defaultDeployPath)
-   (= (first (:args i)) "list-files") (list-files (-> i
-                                                      :args
-                                                      next
-                                                      first)
-                                                  true
-                                                  false)
-   (= (:args i) ["diff"]) (diffDirectories "gameFolder" "modFolder1")
    :else (println "invalid argument: " (:args i))))
 
 (filterInput input)
