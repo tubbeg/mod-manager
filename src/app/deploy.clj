@@ -152,12 +152,18 @@
       {:error :missing-directory!})))
 
 (defn getAllGamePathsFromDeploy [deploy]
-  (map #(:destination %) deploy))
+  (if (or (= deploy nil) (= deploy {:error :missing-directory!})) 
+    (do 
+      (println "Something went wrong!") 
+      :error) 
+    (map #(:destination %) deploy)))
 
 (defn purgeAllModFiles [config-dir deploy-path]
   (let [deploy (readDeployList deploy-path config-dir)
-        paths (getAllGamePathsFromDeploy deploy)] 
-    (if (notZero paths) 
+        paths (getAllGamePathsFromDeploy deploy)]
+    (if (and (not (= paths :error))
+             (not (= paths nil))
+             (notZero paths)) 
       (do  
         (println "Detected following files:" paths) 
         (println "You are about to delete these files.") 

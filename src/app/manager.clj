@@ -257,6 +257,7 @@
    (= (:args i) ["list-mod"]) (listAllMods true (readDefaultConfig))
    (= (first (:args i)) "compare") (compFiles i)
    (= (:args i) ["clean"]) (cleanDir)
+   (= (first (:args i)) "test") (println (next (:args i)))
    (= (first (:args i)) "set-mod") (changeModEntry i)
    (= (:args i) ["deploy"]) (deployMods 
                              defaultConfigDir
