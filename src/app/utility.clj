@@ -4,6 +4,49 @@
    [clojure.java.io :as io]  
    [clojure.string :as s]))
  
+(defn isZero [coll]
+  (< (count coll) 1))
+
+(defn removeLastSlash [s]
+  (let [index (s/last-index-of s "/")
+        isNil (= index nil)
+        len (- (count s) 1)
+        lenNotEqualsIndex (not= index len)
+        regex (-> (str ".{" index "}"))]
+    (if (or isNil lenNotEqualsIndex)
+      s
+      (-> regex
+          (re-pattern)
+          (re-seq s)
+          (first)))))
+
+(defn removePrefix [prefix s]
+  (s/replace-first s prefix ""))
+
+(defn switchPrefix [s new old verbose isFile]
+  (when verbose 
+    (println "Switching prefix on: " s) 
+    (println "old: "  old) 
+    (println "new: " new))
+  (let [o (removeLastSlash old)
+        n (removeLastSlash new)
+        newS (->> (str s "/") 
+                  (removePrefix o) 
+                  (str n))]
+    (when verbose 
+      (println "resulting string: " newS))
+    (if isFile
+      (removeLastSlash newS)
+      newS)))
+
+(def test ".mm/mods/modFolder1/file1.txt")
+(def p1 ".mm/mods/modFolder1")
+(def p2 "gameFolder/")
+(switchPrefix test p2 p1 false true)
+
+(defn notZero [coll]
+  (> (count coll) 0))
+ 
  (defn diffDirectories [dir1 dir2]
   (println
    (-> (process {:out :string} "diff -qrs" dir1 dir2)
@@ -24,10 +67,13 @@
    (let [splt (s/split str (re-pattern prefix))]
      (first (next splt))))
  
+(defn list-files-prefix [path prefix] 
+  (let [f (list-files path false true) 
+        l (map (fn [e] (splitPrefix e prefix)) f)] 
+    l))
+ 
  (defn list-files-skip-prefix [path]
-   (let [f (list-files path false true)
-         l (map (fn [e] (splitPrefix e path)) f)]
-     l))
+   (list-files-prefix path path))
  
 (defn directoryExists [path]
   ;(println "checking directory: " path)
@@ -65,6 +111,9 @@
  (defn rmDir [path]
    (shell "rm -rf " path))
  
+ (defn rmFile [path]
+   (shell "rm" path))
+ 
  (defn touchCmd [file]
    (shell "touch " file))
  
@@ -78,6 +127,9 @@
 (defn rsyncDirCmd [from to]
   (shell "rsync" "-a" from to))
  
+(defn rsyncCreateMissingDirectories [from to]
+  (shell "rsync" "-a" "--mkpath" from to))
+ 
 (defn collHasPath [path coll]
   (let [res (filter (fn [e] (= e path)) coll)]
     ;(println "finding" path "in" coll)
@@ -85,14 +137,16 @@
     res))
  
 (defn compareFiles [from to]
-  (if (> (count from) 0)
+  ;(println "destination is" to)
+  ;(println "source is " from)
+  (if (notZero from)
    (loop [f from
           common []]
     (let [_first (first f)
           rem (next f)
-          hasRemainder (> (count rem) 0)
+          hasRemainder (notZero rem)
           matches (collHasPath _first to)
-          hasMatch (> (count matches) 0)]
+          hasMatch (notZero matches)]
       ;(println "has match is" hasMatch "file: " _first)
       (cond
         (and hasRemainder hasMatch) (recur rem (conj common _first))
@@ -104,37 +158,79 @@
 
 (defn renameFiles [common-files ext prefix]
   (println "Renaming files: " common-files)
-  (when (> (count common-files) 0)
+  (when (notZero common-files)
     (loop [files common-files]
       (let [f (first files)
             rem (next files)
-            continue (> (count rem) 0)
+            continue (notZero rem)
             mvFrom (str prefix f)
-            mvTo (str prefix f ext)]
-        (println "Changing file name: " mvFrom "to" mvTo)
+            mvTo (str prefix f ext)] 
+        (println "Changing file name: " mvFrom "to" mvTo) 
         (mvCmd mvFrom mvTo)
         (if continue
           (recur rem)
           :done)))))
 
+(defn moveFiles [common-files dest prefix] 
+  (println "Moving original files to source: " common-files)
+  (when (notZero common-files)
+     (loop [files common-files]
+       (let [f (first files)
+             rem (next files)
+             mvFrom (str prefix f)]
+         (println "File is: " f)
+         (println "Moving file: " mvFrom "to" dest)
+         (mvCmd mvFrom dest)
+         (if (notZero rem)
+           (recur rem)
+           :done)))))
 
-(defn copyDirNoReplace [from to ext]  
-  (let [to-files (list-files-skip-prefix to) 
-        from-file (list-files-skip-prefix from) 
-        commonFiles (compareFiles to-files from-file) 
-        hasCommon (> (count commonFiles) 0)]
-    ;(println "from" from-file)
-    ;(println "to" to-files)
-    ;(println "common files" commonFiles)
-    (when hasCommon 
+(defn copyDir [from to replace dest] 
+  (println "source is" from "destination is" to) 
+  (when (not replace) 
+    (let [to-files (list-files-skip-prefix to) 
+          from-file (list-files-skip-prefix from) 
+          commonFiles (compareFiles from-file to-files) 
+          hasCommon (notZero commonFiles)] 
+      (when hasCommon
+        (moveFiles commonFiles dest to)))) 
+  (rsyncDirCmd from to))
+
+
+
+(defn copyFile [file mod config replace]
+  (let [source (:source-dir config)
+        game-path (:game-path config)
+        moveFrom (switchPrefix file game-path mod false true)
+        srcDest (switchPrefix
+                 moveFrom
+                 source
+                 game-path
+                 false
+                 true)]
+    (when (and (not replace) (fileExists moveFrom)) 
       (do 
-        (println "has common files!" (count commonFiles)) 
-        (renameFiles commonFiles ext to))) 
-    (rsyncDirCmd from to)))
+        ;(println "prefix switch source is" srcDest)
+        (println "Moving file: " moveFrom "to" srcDest) 
+        (rsyncCreateMissingDirectories moveFrom srcDest))) 
+    (println "Copying" file "to" moveFrom) 
+    (rsyncCreateMissingDirectories file moveFrom) 
+    moveFrom))
+
+(defn getFileExtension [s] 
+  (println "Not yet implemented!"))
+
+(defn removeFileExtension [s]
+  ;(println "removing extension on: " s)
+  (let [index (s/last-index-of s ".")
+        regex (-> (str ".{" index "}"))]
+    (if (= index nil)
+      (do (println "No file extension detected!")
+          s) 
+      (-> regex 
+          (re-pattern) 
+          (re-seq s)
+          (first)))))
 
 
-
-; this does not cover all cases
-(defn removeFileExtension [s] 
-  (first (s/split s #"\.")))
 

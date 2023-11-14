@@ -2,20 +2,30 @@
 
 (ns app.manager
   (:require [babashka.cli :as cli]
-            [clojure.edn :as edn]
             [clojure.string :as s]
+            [app.config :refer []]
             [app.utility :refer [list-files
                                  mkdirCmd
-                                 copyDirNoReplace
+                                 isZero
+                                 notZero
+                                 list-files-prefix
+                                 copyDir
                                  list-files-skip-prefix
                                  compareFiles
+                                 rmFile
+                                 removeLastSlash
                                  diffDirectories
                                  writeToFile
                                  extract
                                  readFile
                                  directoryExists
                                  removeFileExtension]]
-            [babashka.process :refer [shell process exec check]]))
+            [babashka.process :refer [shell process exec check]]
+            [app.deploy :refer [deployMods purgeAllModFiles
+                                listAllMods restoreFiles]]
+            [app.config :refer [initialize
+                                readFromConfig
+                                createConfig]]))
 
 (def input (cli/parse-args *command-line-args* ))
 
@@ -23,69 +33,33 @@
 (def defaultConfigFile ".mm/config.edn")
 (def defaultModFolder ".mm/mods")
 (def defaultExtension ".mm")
+(def defaultSourceDirectory ".mm/source")
+(def defaultDeployPath ".mm/deploy.edn")
 
-(defn createHashKey [s]
-  (->>
-   (hash s)
-   (str "path") 
-   (keyword)))
+(defn readDefaultConfig []
+  (readFromConfig
+   defaultConfigDir
+   defaultConfigFile))
 
-(defn createOrigin [path]
-  (let [f (list-files path false true)]
-    (if (< (count f) 1) 
-      (println "No files found!") 
-      (loop [files f 
-             origin {}]
-        (println "files is" files "and path is" path)
-        (let [first (first files)
-              k (createHashKey first)
-              rem (next files) 
-              newOrigin (assoc origin k :unchanged)]
-          ;(println "neworigin is" newOrigin)
-          (if (< (count files) 1) 
-            origin 
-            (recur rem newOrigin)))))))
+(defn writeDefaultConfig [content] 
+  (writeToFile (str content) defaultConfigFile))
 
-(defn createOriginTracker [mod path]
-  (println "creating origin file from mod:" mod "at path: " path)
-  (let [origin (createOrigin (str defaultModFolder "/" mod))]
-    (writeToFile (str origin) path)))
+(defn isNilOrEmptyString [val]
+  (or
+   (= val nil)
+   (= val "")))
 
-(defn createConfig [gamePath]
-  (if (and (not (= gamePath "")) (not (= gamePath nil))) 
-    (if (not (directoryExists defaultConfigDir)) 
-      (do   
-        (mkdirCmd defaultConfigDir) 
-        (let [conf {:game-path gamePath    
-                    :numberOfMods 0 
-                    :mods {:dir defaultModFolder 
-                           :entries []}}] 
-          (-> conf    
-              str 
-              (writeToFile defaultConfigFile)))) 
-      (println "Error: .mm config already exists!"))
-    (println "Invalid path!")))
+(defn parse-int [s]
+  (Integer/parseInt (re-find #"\A-?\d+" s)))
 
-(defn readFromConfig []
-  (if (directoryExists defaultConfigDir) 
-    (->
-     (readFile defaultConfigFile)  
-     (edn/read-string))
-    (do
-     (println "Error! Missing config directory!") 
-     {:error :missing-directory!})))
-
-(defn printStatus []
-  (->> (readFromConfig)
-      (println "status: ")))
-
-(defn createModEntry [mod n dir priority]
-  (let [entry {:name n
-               :priority priority
-               :enabled true
-               :path (str dir "/" n)
-               :source mod}]
-    entry))
+(defn createModEntry [source name dir priority enable]
+  (println "Creating entry for mod: " name)
+  (println "with priority: " priority)
+  {:name name
+   :priority (parse-int priority) 
+   :enabled enable 
+   :path (str dir "/" name) 
+   :source source})
 
 
 (defn appendModEntry [config entry]
@@ -105,58 +79,53 @@
     (> nrOfMatches 0)))
 
 
-(defn installMod [mod-path]
+(defn _installMod [mod-path priority]
   (if (directoryExists defaultConfigDir) 
-  (do
-    (println "installing: " mod-path) 
-    (let [m (first mod-path)
-          n (removeFileExtension m) 
-          c (readFromConfig)
-          dir (-> c 
+    (do 
+      (println "installing:" mod-path) 
+      (let [m  mod-path 
+            n (removeFileExtension m) 
+            c (readDefaultConfig) 
+            dir (-> c 
                   :mods 
-                  :dir)
-          fullpath (str dir "/" n)] 
-      (if (hasMod c n)  
-        (println "Error: mod already exists!") 
-        (do 
-          (mkdirCmd fullpath)
-          (extract m fullpath)
-          ;(createOriginTracker n (str ".mm/" n "-origin.edn"))
-          (let [prio (:numberOfMods c) 
-                e (createModEntry m n dir prio) 
-                newEntries (appendModEntry c e) 
-                newConfig (-> (assoc c :mods newEntries) 
-                              (assoc :numberOfMods
-                                     (+ (:numberOfMods c) 1)))]
-            
-            (println "new config is: " newConfig) 
-            (writeToFile (str newConfig) defaultConfigFile)
-            (println "Succesfully installed mod at: " dir))))))
-    (println "Error! Missing config directory!")))
+                  :dir) 
+            fullpath (str dir "/" n)]  
+        (if (hasMod c n)   
+          (println "Error: mod already exists!")  
+          (do  
+            (mkdirCmd fullpath) 
+            (extract m fullpath) 
+            (let [e (createModEntry m n dir priority true)  
+                  newEntries (appendModEntry c e)  
+                  newConfig (-> (assoc c :mods newEntries)  
+                                (assoc :numberOfMods 
+                                       (+ (:numberOfMods c) 1)))]
+              
+              (println "new config is: " newConfig) 
+              (writeToFile (str newConfig) defaultConfigFile) 
+              (println "Succesfully installed mod at: " dir)))))) 
+              (println "Error! Missing config directory!")))
 
+(defn installMod [mod-path priority]
+  (if (or (isNilOrEmptyString mod-path)
+          (isNilOrEmptyString priority))
+    (println "Error! Invalid name or priority!")
+    (_installMod mod-path priority)))
 
+(defn install [i]
+  (let [mod (-> i
+                :args
+                (next)
+                (first))
+        prio (-> i
+                 :args
+                 (next)
+                 (next)
+                 (first))
+        trimmed (s/trim mod)]
+    (println "installing mod: " trimmed)
+    (installMod trimmed prio)))
 
-(defn findIdenticalFiles []
-  )
-
-(defn deployMods [ext]
-  (if (not (directoryExists defaultConfigDir))
-    (println "Error! Missing config directory!")
-    (let [config (readFromConfig)
-          game-dir (:game-path config)
-          entries (-> config
-                      :mods
-                      :entries)]
-      (if (< (count entries) 1) 
-        (println "Error! No mods to deploy!") 
-        (loop [e (sort-by :priority entries)] 
-          (let [m (first e) 
-                remainder (next e)
-                p (:path m)]
-            (copyDirNoReplace (str p "/") game-dir ext)
-            (if (< (count remainder) 1)
-              (println "Finished deploying")
-              (recur remainder))))))))
 
 (defn compFiles [i]
   (let [from (-> i
@@ -174,35 +143,135 @@
     (println (compareFiles from to))))
 
 
-(defn filterExtension [files ext]
-  )
 
-(defn removeWithExt [ext]
-  (let [c (readFromConfig)
-        path (:game-path c)
-        files (list-files path false true)]
+
+
+
+(defn cleanDir []
+  (println "You are about to delete your mod directory!")
+  (println "Create BACKUP of any files you might need!")
+  (println "Continue? (Y/n)")
+  (when (= (read-line) "Y")
+    (do
+      (println "Removing .mm files...") 
+      (shell "rm -rf .mm"))))
+
+
+(defn searchMod [name coll]
+  (filter #(= name (:name %)) coll))
+
+(defn changeEntry [mod-name entry coll]
+  (map #(if (= mod-name (:name %)) 
+          entry 
+          %)
+       coll))
+
+(defn enableMod [i]
+  (let [c (readDefaultConfig)]
     ))
+
+(defn get-mod [mod-name config]
+  (let [entries (-> config
+                    :mods
+                    :entries)
+        matches (searchMod mod-name entries)
+        zero (isZero matches)]
+    (if zero
+      :error
+      (first matches))))
+
+(defn set-mod [mod-name enable priority config]
+  (let [entries (-> config
+                    :mods
+                    :entries)
+        dir (-> config
+                :mods
+                :dir)
+        mod (get-mod mod-name config)
+        modsConfig (:mods config) 
+        newEntry (createModEntry  
+                  (:source mod)  
+                  mod-name 
+                  dir 
+                  priority 
+                  enable) 
+        newEntries (changeEntry mod-name newEntry entries) 
+        newMods (assoc modsConfig :entries newEntries) 
+        newConfig (assoc config :mods newMods)] 
+    (if (or (= mod nil) (= mod :error))
+      (println "Error in setting mod!")
+      (do 
+        (println "Created new config: " newConfig)
+        (writeDefaultConfig newConfig)))))
+
+(defn changeModEntry [i]
+  (let [mod-name (-> i
+                     :args
+                     (next)
+                     (first))
+        enable (-> i
+                   :args
+                   (next)
+                   (next)
+                   (first)
+                   (parse-boolean))
+        prio (-> i
+                 :args
+                 (next)
+                 (next)
+                 (next)
+                 (first))]
+    
+  (if (or (isNilOrEmptyString mod-name)
+          (isNilOrEmptyString prio)
+          (isNilOrEmptyString enable))
+    (println "Invalid input!")
+    (set-mod mod-name enable prio (readDefaultConfig)))))
+
+
+(defn printStatus []
+  (let [c (readDefaultConfig)
+        entries (->> c
+                    :mods
+                    :entries
+                    (sort-by :priority))]
+    (println "Config file:" c)
+    (println "")
+    (println "Name\t\tPriority\t\tEnabled?")
+    (loop [e entries]
+      (let [f (first e)
+            rem (next e)]
+        (println (str (:name f)
+                      "\t\t" (:priority f)
+                      "\t\t" (:enabled f)))
+        (if (isZero rem)
+          (println (str "\n" "Done..."))
+          (recur rem))))))
 
 (defn filterInput [i]
  (cond 
    (= (:args i) ["help"]) (println "not yet implemented!")
    (= (:args i) ["status"]) (printStatus) 
-   (= (first (:args i)) "init") (-> i
-                                   :args
-                                   next
-                                   first
-                                   createConfig) 
-   (= (first (:args i)) "install") (-> i
-                                      :args
-                                      next
-                                      installMod)
-   (= (:args i) ["purge"]) (println "not yet implemented")
+   (= (first (:args i)) "init") (initialize
+                                 i
+                                 defaultConfigFile
+                                 defaultConfigDir
+                                 defaultSourceDirectory
+                                 defaultModFolder) 
+   (= (first (:args i)) "install") (install i)
+   (= (:args i) ["restore"]) (restoreFiles (readDefaultConfig))
+   (= (:args i) ["purge"]) (purgeAllModFiles
+                            defaultConfigDir
+                            defaultDeployPath)
+   (= (:args i) ["list-mod"]) (listAllMods true (readDefaultConfig))
    (= (first (:args i)) "compare") (compFiles i)
-   (= (:args i) ["clean"]) (shell "rm -rf .mm")
-   (= (:args i) ["enable"]) (println "not yet implemented") 
-   (= (:args i) ["disable"]) (println "not yet implemented")
+   (= (:args i) ["clean"]) (cleanDir)
+   (= (first (:args i)) "set-mod") (changeModEntry i)
    (= (first (:args i)) ["set-priority"]) (println "not yet implemented")
-   (= (:args i) ["deploy"]) (deployMods defaultExtension)
+   (= (:args i) ["deploy"]) (deployMods 
+                             defaultConfigDir
+                             defaultConfigFile
+                             defaultDeployPath)
    (= (first (:args i)) "list-files") (list-files (-> i
                                                       :args
                                                       next
@@ -213,12 +282,3 @@
    :else (println "invalid argument: " (:args i))))
 
 (filterInput input)
-
-
-(def test1 ".mm/mods/test/Generated/Public/Shared/Assets/Characters/_Models/Dragonborn/_Female/Resources/DGB_F_ARM_FlamingFist_Leather_Body.gr2")
-
-(def test2 ".mm3/mods/test/Generated/Public/Shared/Assets/Characters/_Models/Dragonborn/_Female/Resources/DGB_F_ARM_FlamingFist_Leather_Body.gr2")
-
-(createHashKey test1)
-
-(s/split "./modFolder1/file1.txt" #"./modFolder1")
