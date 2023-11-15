@@ -263,17 +263,28 @@
 (defn filterDisabledMods [entries]
   (filter #(:enabled %) entries))
 
+(defn addBackSlashBeforeWhiteSpace [s]
+  (if (isNilOrEmptyString s)
+    {:error :invalid-arg}
+    (let [r (s/replace s #"[\ `]" "\\\\$0")]
+      (if (isNilOrEmptyString r)
+        {:error :white-space}
+        r))))
+
 (defn buildDir2 [entries]
    (if (notZero entries) 
      (if (= (count entries) 1) 
        (let [e (first entries)]
          (println "Only one entry:")
          (println "first entry is is" e)
-         (if (:enabled e)
-           (:path e)
+         (if (:enabled e) 
+           (addBackSlashBeforeWhiteSpace (:path e)) 
            errorPath))
        (->> (filterDisabledMods entries) 
-            (map #(str (:path %) ":"))
+            (map
+             #(str
+               (addBackSlashBeforeWhiteSpace (:path %)) 
+               ":"))
             (s/join) 
             (removeLastColon)))
      errorPath))

@@ -4,12 +4,20 @@
    [clojure.java.io :as io]  
    [clojure.string :as s]
    [clojure.edn :as edn]))
- 
+
 (defn isNilOrEmptyString [s]
   (or
    (= s nil)
    (= s "")))
 
+(defn addBackSlashBeforeWhiteSpace [s]
+  (if (isNilOrEmptyString s)
+    {:error :invalid-arg}
+    (let [r (s/replace s #"[\ `]" "\\\\$0")]
+      (if (isNilOrEmptyString r)
+        {:error :white-space}
+        r))))
+ 
 (defn isZero [coll]
   (< (count coll) 1))
 
@@ -60,11 +68,12 @@
         upperdir (str "upperdir=" upper ",")
         work (str "workdir=" work)
         dirs (str lowerdir upperdir work)
-        full (str "mount -t overlay " name " -o " dirs " " merge)]
+        full (str "mount -t overlay " name " -o " dirs " '" merge "'")]
+    ;(println "command is:\n" full)
     (println "You are about to mount an overlay to"
              merge "with name" name "\n"  
              "\nThis requires superuser permissions\n")
-    (println "Do you want to continue? (Y/n)")
+    (println "Do you want to continue? (Y/n)") 
     (if (= (read-line) "Y")
       (try 
         (do 
@@ -74,7 +83,7 @@
         (catch Exception e
           (printErrorMessage e)
           :error))
-     (println "Mount canceled"))))
+      (println "Mount canceled"))))
 
 
 (defn notZero [coll]
