@@ -2,13 +2,19 @@
   (:require 
    [babashka.process :refer [shell process exec]] 
    [clojure.java.io :as io]  
-   [clojure.string :as s]))
+   [clojure.string :as s]
+   [clojure.edn :as edn]))
  
+(defn isNilOrEmptyString [s]
+  (or
+   (= s nil)
+   (= s "")))
+
 (defn isZero [coll]
   (< (count coll) 1))
 
-(defn removeLastSlash [s]
-  (let [index (s/last-index-of s "/")
+(defn removeLastSymbol [s symb]
+  (let [index (s/last-index-of s symb)
         isNil (= index nil)
         len (- (count s) 1)
         lenNotEqualsIndex (not= index len)
@@ -20,13 +26,25 @@
           (re-seq s)
           (first)))))
 
+(defn removeLastSlash [s]
+  (removeLastSymbol s "./"))
+
+(defn removeLastColon [s]
+  (removeLastSymbol s ":"))
+
+(removeLastColon "sdasasda/\"//&&!I))sda:::12ur r,.r e8  32718:7d:")
+
 (defn removePrefix [prefix s]
   (s/replace-first s prefix ""))
 
 (defn unmountOverlay [name]
   (println "Removing mount: " name)
-  (shell "umount " name)
-  (println "Done..."))
+  (try
+    (do
+      (shell "umount " name) 
+      (println "Done...")) 
+  (catch Exception e
+    (println "Exception: " e))))
 
 (defn printErrorMessage [e] 
   (println "Encountered exception: " e "\n")
@@ -44,8 +62,8 @@
         dirs (str lowerdir upperdir work)
         full (str "mount -t overlay " name " -o " dirs " " merge)]
     (println "You are about to mount an overlay to"
-             merge "with name" name   
-             "This requires superuser permissions")
+             merge "with name" name "\n"  
+             "\nThis requires superuser permissions\n")
     (println "Do you want to continue? (Y/n)")
     (if (= (read-line) "Y")
       (try 

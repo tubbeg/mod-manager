@@ -11,37 +11,6 @@
    [clojure.string :as s]))
 
 
-(defn listAllModFiles [mod-names mods-path]
-  (when (notZero mod-names)
-    (loop [m mod-names
-           coll []]
-      (let [firstMod (first m)
-            remaining (next m)
-            files (-> (list-files-prefix mods-path firstMod)
-                      (concat coll)
-                      (into []))]
-        (if (notZero remaining)
-          (recur remaining files)
-          files)))))
-
-(defn equalPathsPrefix [p1 p1Prefix p2 p2Prefix]
-  (let [c1 (removePrefix p1Prefix p1)
-        c2 (removePrefix p2Prefix p2)]
-    ;(println "Comparing: " c1 "and" c2)
-    (= c1 c2)))
-
-(defn hasConflict [mod-file mod-path listOfFiles]
-  (if (notZero listOfFiles) 
-    (let [filteredFiles (filter #(equalPathsPrefix  
-                                  mod-file  
-                                  mod-path 
-                                  (:full-path %)  
-                                  (:prefix %)) listOfFiles) 
-          n (notZero filteredFiles)]
-      n) 
-    false))
-
-
 (defn copyToDir [entries dir]
   (if (notZero entries)
     (loop [e entries]
@@ -50,9 +19,12 @@
             path (-> entry
                      :path
                      (removeLastSlash)
-                     (str "/"))] 
-        (println "Copying dir: " path)
-        (rsyncDirCmd path dir)
+                     (str "/"))
+            enabled (-> entry
+                        :enabled)] 
+        (when enabled
+         (println "Copying dir: " path) 
+          (rsyncDirCmd path dir))
         (if (notZero rem)
           (recur rem)
           :done))) 
@@ -70,7 +42,9 @@
                      (removeLastSlash)
                      (str "/")) 
         upper (-> config 
-                  :upper-dir)
+                  :upper-dir
+                  (removeLastSlash)
+                  (str "/"))
         ordered (sort-by :priority entries)
         ] 
     (copyToDir ordered work-dir)
