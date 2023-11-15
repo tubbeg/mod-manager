@@ -144,6 +144,42 @@
       :error
       (first matches))))
 
+(defn filterEntriesByName [mod-name entries]
+  (filter #(not= (:name %) mod-name) entries))
+
+(defn remove-mod [mod-name config]
+  (let [entries (-> config
+                    :mods
+                    :entries) 
+        mod (get-mod mod-name config) 
+        path (:path mod)
+        modsConfig (:mods config)
+        newEntries (filterEntriesByName mod-name entries)
+        newMods (assoc modsConfig :entries newEntries)
+        newConfig (assoc config :mods newMods)]
+    (if (or (= mod nil) (= mod :error))
+      (println "Error in removing mod!")
+      (do
+        (println "Created new config: " newConfig)
+        (writeDefaultConfig newConfig)
+        path))))
+
+(defn removeModAndFiles [config i]
+  (let [mod-name (-> i
+                     :args
+                     (next)
+                     (first))] 
+    (if (isNilOrEmptyString mod-name) 
+      (println "Invalid name!") 
+      (do 
+        (println "Removing files from: " mod-name) 
+        (println "Continue? (Y/n)") 
+        (if (= (read-line) "Y") 
+          (->> 
+           (remove-mod mod-name config) 
+           (shell "rm -rf")) 
+          (println "Aborted"))))))
+
 (defn set-mod [mod-name enable priority config]
   (let [entries (-> config
                     :mods
@@ -300,7 +336,7 @@
                          defaultOverlayName) 
     (firstArg i "install") (install i) 
     (firstArg i "clean") (cleanDir) 
-    (firstArg i "remove-mod") (changeModEntry i) 
+    (firstArg i "remove-mod") (removeModAndFiles (readDefaultConfig) i) 
     (firstArg i "set-mod") (changeModEntry i) 
     :else (println "invalid argument: " (:args i))))
 
