@@ -317,10 +317,10 @@
 
 
 (defn quickHelp []
-  (println "Initialize a .mm directory using 'mm init $MY_PATH")
+  (println "Initialize a .mm directory using 'mm init $MY_PATH'")
   (println "Files will be installed to your .mm directory (.mm/mods)")
   (println "Check status with 'mm status'")
-  (println "Install mods using 'mm install /path/to/mod.zip' 100")
+  (println "Install mods using 'mm install /path/to/mod.zip 100'")
   (println "the last number is the priority (load order)")
   (println "Priority order, and enabling and disabling mods can")
   (println "be done using 'mm set-mod myModName false 123'")
