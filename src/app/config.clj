@@ -7,15 +7,19 @@
 
 
 (defn createConfig
-  [gamePath config config-dir source-dir mod-dir]
+  [gamePath config config-dir mod-dir upper work name]
   (if (and (not= gamePath "") (not= gamePath nil))
     (if (not (directoryExists config-dir))
       (do
         (mkdirCmd config-dir)
-        (mkdirCmd source-dir)
+        (mkdirCmd work)
+        (mkdirCmd upper)
         (let [conf {:game-path gamePath
+                    :overlay-name name
+                    :deployed false
                     :numberOfMods 0
-                    :source-dir source-dir
+                    :work-dir work
+                    :upper-dir upper
                     :mods {:dir mod-dir
                            :entries []}}]
           (-> conf
@@ -34,9 +38,9 @@
       {:error :missing-directory!})))
 
 (defn initialize
-  [i config config-dir source-dir mod-dir]
+  [i config config-dir mod-dir upper work name]
   (-> i
       :args
       (next)
       (first)
-      (createConfig config config-dir source-dir mod-dir)))
+      (createConfig config config-dir mod-dir upper work name)))

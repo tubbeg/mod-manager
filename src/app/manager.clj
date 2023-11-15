@@ -4,37 +4,28 @@
   (:require [babashka.cli :as cli]
             [clojure.string :as s]
             [app.config :refer []]
-            [app.utility :refer [list-files
-                                 mkdirCmd
+            [app.utility :refer [mkdirCmd
+                                 mountOverlay
+                                 unmountOverlay
                                  isZero
                                  notZero
-                                 list-files-prefix
-                                 copyDir
-                                 list-files-skip-prefix
-                                 compareFiles
-                                 rmFile
-                                 removeLastSlash
-                                 diffDirectories
                                  writeToFile
                                  extract
-                                 readFile
                                  directoryExists
                                  removeFileExtension]]
             [babashka.process :refer [shell process exec check]]
-            [app.deploy :refer [deployMods purgeAllModFiles
-                                listAllMods restoreFiles]]
+            [app.deploy :refer [moveFilesInPriority]]
             [app.config :refer [initialize
-                                readFromConfig
-                                createConfig]]))
+                                readFromConfig]]))
 
 (def input (cli/parse-args *command-line-args* ))
 
 (def defaultConfigDir ".mm")
+(def defaultOverlayName "myOverlay")
 (def defaultConfigFile ".mm/config.edn")
 (def defaultModFolder ".mm/mods")
-;(def defaultExtension ".mm")
-(def defaultSourceDirectory ".mm/source")
-(def defaultDeployPath ".mm/deploy.edn")
+(def defaultUpperDir ".mm/upper")
+(def defaultWorkDir ".mm/work")
 
 (defn readDefaultConfig []
   (readFromConfig
@@ -125,22 +116,6 @@
         trimmed (s/trim mod)]
     (println "installing mod: " trimmed)
     (installMod trimmed prio)))
-
-
-(defn compFiles [i]
-  (let [from (-> i
-                 :args
-                 next
-                 first
-                 (list-files-skip-prefix))
-        to (-> i
-               :args
-               next
-               next
-               first
-               (list-files-skip-prefix))]
-    (println "comparing: " to from)
-    (println (compareFiles from to))))
 
 (defn cleanDir []
   (println "You are about to delete your mod directory!")
@@ -241,29 +216,70 @@
 
 
 (defn firstArg [i match]
-  (= (s/trim (first (:args i))) match))
+  (if (not= i nil) 
+    (= (s/trim (first (:args i))) match)
+    false))
 
-(defn filterInput [i]
- (cond 
-   (firstArg i "help") (println "not yet implemented!")
-   (firstArg i "status") (printStatus) 
-   (firstArg i "init") (initialize
-                                 i
-                                 defaultConfigFile
-                                 defaultConfigDir
-                                 defaultSourceDirectory
-                                 defaultModFolder) 
-   (firstArg i "install") (install i)
-   (firstArg i "restore") (restoreFiles (readDefaultConfig))
-   (firstArg i "purge") (purgeAllModFiles
-                            defaultConfigDir
-                            defaultDeployPath)
-   (firstArg i "clean") (cleanDir) 
-   (firstArg i "set-mod") (changeModEntry i)
-   (firstArg i "deploy") (deployMods 
-                             defaultConfigDir
-                             defaultConfigFile
-                             defaultDeployPath)
-   :else (println "invalid argument: " (:args i))))
+(defn buildDir [paths]
+  (if (notZero paths)
+    (loop [p paths
+           s ""]
+      (let [first-path (first p)
+            rem (next p)
+            new-dir (str first-path ":" s)]
+        (if (isZero rem)
+          (str s first-path)
+          (recur rem new-dir))))
+  {:error :missing-paths}))
+
+(defn mount-mods [config]
+  (let [entries (-> config
+                    :mods
+                    :entries)
+        game-path (-> config
+                      :game-path)
+        paths (map #(:path %) entries) 
+        lowerdir (buildDir paths)
+        upperdir (-> config
+                     :upper-dir)
+        work (-> config
+                 :work-dir)
+        name (-> config
+                 :overlay-name)]
+    (println "Lower dir: " lowerdir)
+    (println "Upper dir: " upperdir)
+    (println "Work dir: " work)
+    (println "Overlay name: " name)
+    (println "Destination: " game-path)
+    (mountOverlay name upperdir lowerdir work game-path)
+    (moveFilesInPriority config)))
+
+(defn unmount-mods [config] 
+  (unmountOverlay (:overlay-name config)))
+
+(defn filterInput [i] 
+  (cond  
+    (firstArg i "help") (println "not yet implemented!") 
+    (firstArg i "status") (printStatus) 
+    ;run mount and unmount commands with
+    ;sudo -E env "PATH=$PATH" ... mount
+    ;otherwise 
+    (firstArg i "mount") (mount-mods (readDefaultConfig)) 
+    (firstArg i "unmount") (unmount-mods (readDefaultConfig)) 
+    (firstArg i "init") (initialize  
+                         i  
+                         defaultConfigFile  
+                         defaultConfigDir 
+                         defaultModFolder 
+                         defaultUpperDir 
+                         defaultWorkDir
+                         defaultOverlayName) 
+    (firstArg i "install") (install i) 
+    (firstArg i "clean") (cleanDir) 
+    (firstArg i "set-mod") (changeModEntry i) 
+    :else (println "invalid argument: " (:args i))))
+
+
 
 (filterInput input)
+

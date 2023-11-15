@@ -23,25 +23,39 @@
 (defn removePrefix [prefix s]
   (s/replace-first s prefix ""))
 
-(defn switchPrefix [s new old verbose isFile]
-  (when verbose 
-    (println "Switching prefix on: " s) 
-    (println "old: "  old) 
-    (println "new: " new))
-  (let [o (removeLastSlash old)
-        n (removeLastSlash new)
-        newS (->> (str s "/") 
-                  (removePrefix o) 
-                  (str n))]
-    (when verbose 
-      (println "resulting string: " newS))
-    (if isFile
-      (removeLastSlash newS)
-      newS)))
+(defn unmountOverlay [name]
+  (println "Removing mount: " name)
+  (shell "umount " name)
+  (println "Done..."))
 
-(def test ".mm/mods/modFolder1/file1.txt")
-(def p1 ".mm/mods/modFolder1")
-(def p2 "gameFolder/")
+(defn printErrorMessage [e] 
+  (println "Encountered exception: " e "\n")
+  (println "Check that the directory paths are correct!")
+  (println "Verify that you are a superuser.")
+  (println (str "You can run this" 
+                " script using: 'sudo -E env \"PATH=$PATH\""
+                " /path/to/script mount'")))
+
+
+(defn mountOverlay [name upper lower work merge]
+  (let [lowerdir (str "lowerdir=" lower ",")
+        upperdir (str "upperdir=" upper ",")
+        work (str "workdir=" work)
+        dirs (str lowerdir upperdir work)
+        full (str "mount -t overlay " name " -o " dirs " " merge)]
+    (println "You are about to mount an overlay to"
+             merge "with name" name   
+             "This requires superuser permissions")
+    (println "Do you want to continue? (Y/n)")
+    (if (= (read-line) "Y")
+      (try 
+        (do 
+          (shell full) 
+          (println "Done...")) 
+        (catch Exception e
+          (printErrorMessage e)))
+     (println "Mount canceled"))))
+
 
 (defn notZero [coll]
   (> (count coll) 0))
@@ -149,70 +163,12 @@
         :else common)))
     (println "No files detected!")))
 
+(defn isOriginal [rename file1 file2]
+  (and
+   (= rename :not-applicable)
+   (= file1 file2)))
 
-(defn renameFiles [common-files ext prefix]
-  (println "Renaming files: " common-files)
-  (when (notZero common-files)
-    (loop [files common-files]
-      (let [f (first files)
-            rem (next files)
-            continue (notZero rem)
-            mvFrom (str prefix f)
-            mvTo (str prefix f ext)] 
-        (println "Changing file name: " mvFrom "to" mvTo) 
-        (mvCmd mvFrom mvTo)
-        (if continue
-          (recur rem)
-          :done)))))
-
-(defn moveFiles [common-files dest prefix] 
-  (println "Moving original files to source: " common-files)
-  (when (notZero common-files)
-     (loop [files common-files]
-       (let [f (first files)
-             rem (next files)
-             mvFrom (str prefix f)]
-         (println "File is: " f)
-         (println "Moving file: " mvFrom "to" dest)
-         (mvCmd mvFrom dest)
-         (if (notZero rem)
-           (recur rem)
-           :done)))))
-
-(defn copyDir [from to replace dest] 
-  (println "source is" from "destination is" to) 
-  (when (not replace) 
-    (let [to-files (list-files-skip-prefix to) 
-          from-file (list-files-skip-prefix from) 
-          commonFiles (compareFiles from-file to-files) 
-          hasCommon (notZero commonFiles)] 
-      (when hasCommon
-        (moveFiles commonFiles dest to)))) 
-  (rsyncDirCmd from to))
-
-
-
-(defn copyFile [file mod config replace]
-  (let [source (:source-dir config)
-        game-path (:game-path config)
-        moveFrom (switchPrefix file game-path mod false true)
-        srcDest (switchPrefix
-                 moveFrom
-                 source
-                 game-path
-                 false
-                 true)]
-    (when (and (not replace) (fileExists moveFrom)) 
-      (do 
-        (println "Moving file: " moveFrom "to" srcDest) 
-        (rsyncCreateMissingDirectories moveFrom srcDest))) 
-    (println "Copying" file "to" moveFrom) 
-    (rsyncCreateMissingDirectories file moveFrom) 
-    moveFrom))
-
-(defn getFileExtension [s] 
-  (println "Not yet implemented!"))
-
+    
 (defn removeFileExtension [s]
   (let [index (s/last-index-of s ".")
         regex (-> (str ".{" index "}"))]
