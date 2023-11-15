@@ -13,6 +13,7 @@
                                  extract
                                  removeLastColon
                                  isNilOrEmptyString
+                                 addBackSlashBeforeWhiteSpace
                                  directoryExists
                                  removeFileExtension]]
             [babashka.process :refer [shell process exec check]]
@@ -263,13 +264,6 @@
 (defn filterDisabledMods [entries]
   (filter #(:enabled %) entries))
 
-(defn addBackSlashBeforeWhiteSpace [s]
-  (if (isNilOrEmptyString s)
-    {:error :invalid-arg}
-    (let [r (s/replace s #"[\ `]" "\\\\$0")]
-      (if (isNilOrEmptyString r)
-        {:error :white-space}
-        r))))
 
 (defn buildDir2 [entries]
    (if (notZero entries) 
@@ -321,6 +315,22 @@
             (moveFilesInPriority config) 
             (println "Done!")))))))
 
+
+(defn quickHelp []
+  (println "Initialize a .mm directory using 'mm init $MY_PATH")
+  (println "Files will be installed to your .mm directory (.mm/mods)")
+  (println "Check status with 'mm status'")
+  (println "Install mods using 'mm install /path/to/mod.zip' 100")
+  (println "the last number is the priority (load order)")
+  (println "Priority order, and enabling and disabling mods can")
+  (println "be done using 'mm set-mod myModName false 123'")
+  (println "Remove mods using 'mm remove-mod myModName'")
+  (println "mount using 'mm mount'")
+  (println "unmount using 'mm unmount'")
+  (println "NOTE! Mounting/unmounting requires a superuser!")
+  (println "You should mount with the following command:")
+  (println "'sudo -E env \"PATH=$PATH\" mm mount"))
+
 (defn unmount-mods [config] 
   (unmountOverlay (:overlay-name config))
   (println "Removing files from: " (:work-dir config)) 
@@ -333,7 +343,7 @@
 
 (defn filterInput [i] 
   (cond  
-    (firstArg i "help") (println "not yet implemented!") 
+    (firstArg i "help") (quickHelp) 
     (firstArg i "status") (printStatus) 
     ;-------
     ;run mount and unmount commands with
