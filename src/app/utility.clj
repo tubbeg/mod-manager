@@ -122,7 +122,7 @@
   ;(println "checking directory: " path)
   (.isDirectory (io/file path))) 
  
- (defn fileExists [path] 
+ (defn isFile [path] 
    (.exists (io/file path)))
 
  (defn ls-and-grep [search]

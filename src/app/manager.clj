@@ -15,6 +15,7 @@
                                  isNilOrEmptyString
                                  addBackSlashBeforeWhiteSpace
                                  directoryExists
+                                 isFile
                                  removeFileExtension]]
             [babashka.process :refer [shell process exec check]]
             [app.deploy :refer [moveFilesInPriority]]
@@ -69,9 +70,13 @@
     (> nrOfMatches 0)))
 
 
+(defn handleTemplate [config template]
+  (println "Not yet implemented!"))
+
 (defn _installMod [mod-path priority]
-  (if (directoryExists defaultConfigDir) 
-    (do 
+  (if (and (directoryExists defaultConfigDir)
+           (isFile mod-path)) 
+    (do  
       (println "installing:" mod-path) 
       (let [m  mod-path 
             n (removeFileExtension m) 
@@ -93,8 +98,11 @@
               
               (println "new config is: " newConfig) 
               (writeToFile (str newConfig) defaultConfigFile) 
-              (println "Succesfully installed mod at: " dir)))))) 
-              (println "Error! Missing config directory!")))
+              (println "Succesfully installed mod at: " dir)
+              (println "Running template")
+              (handleTemplate nil nil)))))) 
+              (println "Error! Missing config directory or"
+                       "invalid file")))
 
 (defn installMod [mod-path priority]
   (if (or (isNilOrEmptyString mod-path)
@@ -228,6 +236,8 @@
           (isNilOrEmptyString enable))
     (println "Invalid input!")
     (set-mod mod-name enable prio (readDefaultConfig)))))
+
+
 
 
 (defn printStatus []
