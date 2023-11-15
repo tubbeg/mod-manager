@@ -300,10 +300,15 @@
         (println "Upper dir: " upperdir) 
         (println "Work dir: " work) 
         (println "Overlay name: " name) 
-        (println "Destination: " game-path) 
-        (mountOverlay name upperdir lowerdir work game-path) 
-        (moveFilesInPriority config) 
-        (println "Done!")))))
+        (println "Destination: " game-path)
+        (let [res (mountOverlay name
+                                upperdir
+                                lowerdir
+                                work
+                                game-path)] 
+          (when (= res :ok) 
+            (moveFilesInPriority config) 
+            (println "Done!")))))))
 
 (defn unmount-mods [config] 
   (unmountOverlay (:overlay-name config))

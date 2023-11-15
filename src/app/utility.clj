@@ -69,9 +69,11 @@
       (try 
         (do 
           (shell full) 
-          (println "Done...")) 
+          (println "Done...")
+          :ok) 
         (catch Exception e
-          (printErrorMessage e)))
+          (printErrorMessage e)
+          :error))
      (println "Mount canceled"))))
 
 
