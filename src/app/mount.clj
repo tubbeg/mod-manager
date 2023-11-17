@@ -36,22 +36,22 @@
 
 (defn unmount-mods [config config-path]
   (if (= (:deployed config) true)
-    (let [res (unmountOverlay (:overlay-name config))
-          isNoFailure (= res :ok)]
-      (if isNoFailure
-        (do
-          (println "Removing files from: " (:work-dir config))
-          (println "Removing files from: " (:upper-dir config))
-          (println "Continue? (Y/n)")
-          (when (= (read-line) "Y")
+    (do
+      (println "Detected dir: " (:work-dir config))
+      (println "Detected dir: " (:upper-dir config))
+      (println "Do you want to unmount? (Y/n)")
+      (when (= (read-line) "Y")
+        (if (= (unmountOverlay (:overlay-name config)) :ok)
+          (do
+            (println "Removing upper directory files...")
             (shell "rm -rf" (:work-dir config))
             (shell "rm -rf" (:upper-dir config))
             (-> config
                 (assoc :deployed false)
                 (str)
                 (writeToFile config-path))
-            (println "Done...")))
-        (println "Something went wrong...")))
+            (println "Done...")) 
+          (println "Something went wrong..."))))
     (println "Your overlay is not mounted!")))
 
 
