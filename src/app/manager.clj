@@ -25,6 +25,7 @@
 (def defaultConfigFile ".mm/config.edn")
 (def defaultModFolder ".mm/mods")
 (def defaultUpperDir ".mm/upper")
+(def defaultLowerDir ".mm/lower")
 (def defaultWorkDir ".mm/work")
 
 (defn readDefaultConfig []
@@ -215,6 +216,7 @@
                 defaultConfigFile
                 defaultConfigDir
                 defaultModFolder
+                defaultLowerDir
                 defaultUpperDir
                 defaultWorkDir
                 name)))

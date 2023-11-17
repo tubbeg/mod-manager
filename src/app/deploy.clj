@@ -47,6 +47,7 @@
                   (str "/"))
         ordered (sort-by :priority entries)
         ] 
-    (copyToDir ordered work-dir)
-    (println "Syncing files with upper directory...")
-    (rsyncDirCmd work-dir upper)))
+    (copyToDir ordered upper)
+    ;(println "Syncing files with upper directory...")
+    ;(rsyncDirCmd work-dir upper)
+    ))

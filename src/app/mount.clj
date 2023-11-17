@@ -83,12 +83,10 @@
 (defn mount-mods [config config-path]
   (let [isMounted (-> config
                       :deployed)
-        entries (-> config
-                    :mods
-                    :entries)
         game-path (-> config
                       :game-path)
-        lowerdir (buildDir2 entries)
+        lowerdir (-> config
+                     :lower-dir)
         upperdir (-> config
                      :upper-dir)
         work (-> config
@@ -97,6 +95,7 @@
                  :overlay-name)]
     (mkdirCmd upperdir)
     (mkdirCmd work)
+    (mkdirCmd lowerdir)
     (cond
       isMounted (println "Your overlay is already mounted!")
       (= lowerdir errorPath) (println "No mods available!")

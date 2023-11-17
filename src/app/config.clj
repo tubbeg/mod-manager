@@ -7,7 +7,7 @@
 
 
 (defn createConfig
-  [gamePath config config-dir mod-dir upper work name]
+  [gamePath config config-dir mod-dir lower upper work name]
   (if (not (directoryExists config-dir))
     (do
       (mkdirCmd config-dir)
@@ -19,6 +19,7 @@
                   :numberOfMods 0
                   :work-dir work
                   :upper-dir upper
+                  :lower-dir lower
                   :mods {:dir mod-dir
                          :entries []}}]
         (-> conf
@@ -36,8 +37,8 @@
       {:error :missing-directory!})))
 
 (defn initialize
-  [path config config-dir mod-dir upper work name]
+  [path config config-dir mod-dir lower upper work name]
   (if (isNilOrEmptyString path)
     (println "Invalid path: " path)
     (createConfig path config config-dir
-                  mod-dir upper work name)))
+                  mod-dir lower upper work name)))
