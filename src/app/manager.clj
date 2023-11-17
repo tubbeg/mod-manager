@@ -3,22 +3,22 @@
 (ns app.manager
   (:require [babashka.cli :as cli]
             [clojure.string :as s]
-            [app.utility :refer [
-                                 isZero
+            [app.utility :refer [isZero
                                  notZero
                                  writeToFile
                                  isNilOrEmptyString
                                  directoryExists
                                  isFile]]
-            [babashka.process :refer [shell process exec check]] 
+            [babashka.process :refer [shell
+                                      process
+                                      exec
+                                      check]]
             [app.mount :refer [unmount-mods
                                mount-mods]]
             [app.config :refer [initialize
                                 readFromConfig]]
             [app.install :refer [installMod
                                  createModEntry]]))
-
-
 
 (def defaultConfigDir ".mm")
 (def defaultOverlayName "mm-overlay")
@@ -61,7 +61,7 @@
 
 
 (defn searchMod [name coll]
- 
+
   (filter #(= name (:name %)) coll))
 
 (defn changeEntry [mod-name entry coll]

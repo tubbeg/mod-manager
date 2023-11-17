@@ -23,12 +23,12 @@
     (if (= (count entries) 1)
       (let [e (first entries)]
         (if (:enabled e)
-          (addBackSlashBeforeWhiteSpace (:path e))
+          (str "\"" (:path e) "\"")
           errorPath))
       (->> (filterDisabledMods entries)
            (map
             #(str
-              (addBackSlashBeforeWhiteSpace (:path %))
+              (str "\"" (:path %) "\"")
               ":"))
            (s/join)
            (removeLastColon)))
@@ -49,8 +49,8 @@
             (-> config
                 (assoc :deployed false)
                 (str)
-                (writeToFile config-path)
-                (println "Done..."))))
+                (writeToFile config-path))
+            (println "Done...")))
         (println "Something went wrong...")))
     (println "Your overlay is not mounted!")))
 
