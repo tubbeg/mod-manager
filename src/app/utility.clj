@@ -50,9 +50,11 @@
   (try
     (do
       (shell "umount " name) 
-      (println "Done...")) 
+      (println "Done...")
+      :ok) 
   (catch Exception e
-    (println "Exception: " e))))
+    (println "Exception: " e)
+    :error)))
 
 (defn printErrorMessage [e] 
   (println "Encountered exception: " e "\n")
@@ -65,7 +67,7 @@
 
 (defn mountOverlay [name upper lower work m]
   (let [merge (str "'" m "'")
-        lowerdir (str "lowerdir=" (str (addBackSlashBeforeWhiteSpace m) "/") ":" lower ",")
+        lowerdir (str "lowerdir="  (addBackSlashBeforeWhiteSpace m) ":" lower ",")
         upperdir (str "upperdir=" upper ",")
         work (str "workdir=" work)
         dirs (str lowerdir upperdir work)
