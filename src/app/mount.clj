@@ -2,8 +2,10 @@
   (:require
    [babashka.process :refer [shell process exec check]]
    [clojure.string :as s]
+   [app.config]
    [app.deploy :refer [moveFilesInPriority]]
    [app.utility :refer [unmountOverlay
+                        writeToFile
                         mkdirCmd
                         notZero
                         isNilOrEmptyString
@@ -20,8 +22,6 @@
   (if (notZero entries)
     (if (= (count entries) 1)
       (let [e (first entries)]
-        (println "Only one entry:")
-        (println "first entry is is" e)
         (if (:enabled e)
           (addBackSlashBeforeWhiteSpace (:path e))
           errorPath))
@@ -34,22 +34,29 @@
            (removeLastColon)))
     errorPath))
 
-(defn unmount-mods [config]
-  (let [res (unmountOverlay (:overlay-name config))
-        isNoFailure (= res :ok)]
-    (if isNoFailure
-      (do
-        (println "Removing files from: " (:work-dir config))
-        (println "Removing files from: " (:upper-dir config))
-        (println "Continue? (Y/n)")
-        (when (= (read-line) "Y")
-          (shell "rm -rf" (:work-dir config))
-          (shell "rm -rf" (:upper-dir config))
-          (println "Done...")))
-      (println "Something went wrong..."))))
+(defn unmount-mods [config config-path]
+  (if (= (:deployed config) true)
+    (let [res (unmountOverlay (:overlay-name config))
+          isNoFailure (= res :ok)]
+      (if isNoFailure
+        (do
+          (println "Removing files from: " (:work-dir config))
+          (println "Removing files from: " (:upper-dir config))
+          (println "Continue? (Y/n)")
+          (when (= (read-line) "Y")
+            (shell "rm -rf" (:work-dir config))
+            (shell "rm -rf" (:upper-dir config))
+            (-> config
+                (assoc :deployed false)
+                (str)
+                (writeToFile config-path)
+                (println "Done..."))))
+        (println "Something went wrong...")))
+    (println "Your overlay is not mounted!")))
 
 
-(defn start-mt [name lower upper work merge config]
+
+(defn start-mt [name lower upper work merge config file]
   (println "Lower dir: " lower)
   (println "Upper dir: " upper)
   (println "Work dir: " work)
@@ -59,13 +66,17 @@
                           upper
                           lower
                           work
-                          merge)]
+                          merge)
+        newConfig (assoc config :deployed true)]
     (when (= res :ok)
       (moveFilesInPriority config)
+      (writeToFile (str newConfig) file)
       (println "Done!"))))
 
-(defn mount-mods [config]
-  (let [entries (-> config
+(defn mount-mods [config config-path]
+  (let [isMounted (-> config
+                      :deployed)
+        entries (-> config
                     :mods
                     :entries)
         game-path (-> config
@@ -80,6 +91,7 @@
     (mkdirCmd upperdir)
     (mkdirCmd work)
     (cond
+      isMounted (println "Your overlay is already mounted!")
       (= lowerdir errorPath) (println "No mods available!")
       (not (isNilOrEmptyString lowerdir)) (start-mt
                                            name
@@ -87,5 +99,6 @@
                                            upperdir
                                            work
                                            game-path
-                                           config)
+                                           config
+                                           config-path)
       :else (println "Error! Lower dir missing!"))))

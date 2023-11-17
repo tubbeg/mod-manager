@@ -183,7 +183,7 @@
           (recur rem))))))
 
 (defn mountMods [args]
-  (mount-mods (readDefaultConfig)))
+  (mount-mods (readDefaultConfig) defaultConfigFile))
 
 
 (defn quickHelp [cmdArgs]
@@ -220,7 +220,7 @@
                 name)))
 
 (defn unmount [args]
-  (unmount-mods (readDefaultConfig)))
+  (unmount-mods (readDefaultConfig) defaultConfigFile))
 
 (def table
   [{:cmds ["mount"]   :fn mountMods}
