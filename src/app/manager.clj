@@ -3,30 +3,25 @@
 (ns app.manager
   (:require [babashka.cli :as cli]
             [clojure.string :as s]
-            [app.config :refer []]
-            [app.utility :refer [mkdirCmd
-                                 mountOverlay
-                                 unmountOverlay
+            [app.utility :refer [
                                  isZero
-                                 readFile
                                  notZero
                                  writeToFile
-                                 extract
-                                 removeLastColon
                                  isNilOrEmptyString
-                                 addBackSlashBeforeWhiteSpace
                                  directoryExists
-                                 isFile
-                                 removeFileExtension]]
-            [babashka.process :refer [shell process exec check]]
-            [app.deploy :refer [moveFilesInPriority]]
+                                 isFile]]
+            [babashka.process :refer [shell process exec check]] 
+            [app.mount :refer [unmount-mods
+                               mount-mods]]
             [app.config :refer [initialize
-                                readFromConfig]]))
+                                readFromConfig]]
+            [app.install :refer [installMod
+                                 createModEntry]]))
 
 
 
 (def defaultConfigDir ".mm")
-(def defaultOverlayName "myOverlay")
+(def defaultOverlayName "mm-overlay")
 (def defaultConfigFile ".mm/config.edn")
 (def defaultModFolder ".mm/mods")
 (def defaultUpperDir ".mm/upper")
@@ -43,81 +38,6 @@
 (defn parse-int [s]
   (Integer/parseInt (re-find #"\A-?\d+" s)))
 
-(defn selectPath [alt current]
-  (if (or (isNilOrEmptyString alt)
-          (not (directoryExists alt)))
-    current
-    alt))
-
-(defn createModEntry [source name dir priority enable alt-path]
-  (println "Creating entry for mod: " name)
-  (println "with priority: " priority)
-  {:name name
-   ; priority is the load order currently
-   :priority priority
-   :alt-deploy-path (selectPath alt-path :none)
-   :enabled enable
-   :path (str dir "/" name)
-   :source source})
-
-
-(defn appendModEntry [config entry]
-  (let [entries (-> config
-                    :mods
-                    :entries)
-        newEntry (conj entries entry)]
-    (assoc (:mods config) :entries newEntry)))
-
-(defn hasMod [config name]
-  (let [entries (-> config
-                    :mods
-                    :entries)
-        matches (filter
-                 (fn [e] (= (:name e) name)) entries)
-        nrOfMatches (count matches)]
-    (> nrOfMatches 0)))
-
-
-(defn handleTemplate [config template]
-  (println "Not yet implemented!"))
-
-(defn _installMod [mod-path priority]
-  (println "installing:" mod-path)
-  (let [m  mod-path
-        n (removeFileExtension m)
-        c (readDefaultConfig)
-
-        dir (-> c
-                :mods
-                :dir)
-        fullpath (str dir "/" n)]
-    (if (hasMod c n)
-      (println "Error: mod already exists!")
-      (do
-        (mkdirCmd fullpath)
-        (extract m fullpath)
-        (let [e (createModEntry m n dir priority true :none)
-              newEntries (appendModEntry c e)
-              newConfig (-> (assoc c :mods newEntries)
-                            (assoc :numberOfMods
-                                   (+ (:numberOfMods c) 1)))]
-
-          (println "new config is: " newConfig)
-          (writeToFile (str newConfig) defaultConfigFile)
-          (println "Succesfully installed mod at: " dir)
-          (println "Running template")
-          (handleTemplate nil nil))))))
-
-(defn installMod [mod-path priority]
-  (if (or (isNilOrEmptyString mod-path)
-          (isNilOrEmptyString priority)
-          (not (directoryExists defaultConfigDir))
-          (not (isFile mod-path)))
-    (println "Error! Invalid name or priority!"
-             "Install using with 'mm install <filename> <priority>'"
-             "Verify that your config file is valid.")
-    (_installMod mod-path priority)))
-
 (defn install [i]
   (let [mod (-> i
                 :opts
@@ -127,7 +47,8 @@
                  :priority)
         trimmed (s/trim mod)]
     (println "installing mod: " trimmed)
-    (installMod trimmed prio)))
+    (installMod trimmed prio (readDefaultConfig)
+                defaultConfigFile)))
 
 (defn cleanDir [args]
   (println "You are about to delete your mod directory!")
@@ -140,6 +61,7 @@
 
 
 (defn searchMod [name coll]
+ 
   (filter #(= name (:name %)) coll))
 
 (defn changeEntry [mod-name entry coll]
@@ -196,7 +118,7 @@
 
 
 
-(defn set-mod [mod-name enable priority alt-path config]
+(defn set-mod [mod-name enable priority config]
   (let [entries (-> config
                     :mods
                     :entries)
@@ -210,8 +132,7 @@
                   mod-name
                   dir
                   priority
-                  enable
-                  alt-path)
+                  enable)
         newEntries (changeEntry mod-name newEntry entries)
         newMods (assoc modsConfig :entries newEntries)
         newConfig (assoc config :mods newMods)]
@@ -222,7 +143,6 @@
         (writeDefaultConfig newConfig)))))
 
 (defn changeModEntry [args]
-  (println "Args:" args)
   (let [mod-name (-> args
                      :opts
                      :name)
@@ -231,15 +151,13 @@
                    :enable)
         prio (-> args
                  :opts
-                 :priority)
-        new-path (-> args
-                     :opts
-                     :new-path)]
+                 :priority)]
     (if (or (isNilOrEmptyString mod-name)
             (isNilOrEmptyString prio)
             (isNilOrEmptyString enable))
       (println "Invalid input!")
-      (set-mod mod-name enable prio new-path (readDefaultConfig)))))
+      (set-mod mod-name enable prio
+               (readDefaultConfig)))))
 
 
 
@@ -253,7 +171,7 @@
                      (sort-by :priority))]
     (println "Config file:" c)
     (println "")
-    (println "Name" tabs "Priority" tabs "Enabled?")
+    (println "Name" tabs "Priority (load order)" tabs "Enabled?")
     (loop [e entries]
       (let [f (first e)
             rem (next e)]
@@ -264,72 +182,8 @@
           (println (str "\n" "Done..."))
           (recur rem))))))
 
-
-(defn firstArg [i match]
-  (if
-   (and (not= i nil) (not= match nil))
-    (let [f (first (:args i))]
-      (if (not= f nil)
-        (= (s/trim f) match)
-        false))
-    false))
-
-(def errorPath {:error :missing-paths})
-
-(defn filterDisabledMods [entries]
-  (filter #(:enabled %) entries))
-
-
-(defn buildDir2 [entries]
-  (if (notZero entries)
-    (if (= (count entries) 1)
-      (let [e (first entries)]
-        (println "Only one entry:")
-        (println "first entry is is" e)
-        (if (:enabled e)
-          (addBackSlashBeforeWhiteSpace (:path e))
-          errorPath))
-      (->> (filterDisabledMods entries)
-           (map
-            #(str
-              (addBackSlashBeforeWhiteSpace (:path %))
-              ":"))
-           (s/join)
-           (removeLastColon)))
-    errorPath))
-
-(defn mount-mods [args]
-  (let [config (readDefaultConfig)
-        entries (-> config
-                    :mods
-                    :entries)
-        game-path (-> config
-                      :game-path)
-        lowerdir (buildDir2 entries)
-        upperdir (-> config
-                     :upper-dir)
-        work (-> config
-                 :work-dir)
-        name (-> config
-                 :overlay-name)]
-    (mkdirCmd upperdir)
-    (mkdirCmd work)
-    (if (isNilOrEmptyString lowerdir)
-      (println "Error! Lower dir missing!")
-      (do
-        (println "Lower dir: " lowerdir)
-        (println "Upper dir: " upperdir)
-        (println "Work dir: " work)
-        (println "Overlay name: " name)
-        (println "Destination: " game-path)
-        (let [res (mountOverlay name
-                                upperdir
-                                lowerdir
-                                work
-                                game-path)]
-          (when (= res :ok)
-            (moveFilesInPriority config)
-            (println "Done!")))))))
+(defn mountMods [args]
+  (mount-mods (readDefaultConfig)))
 
 
 (defn quickHelp [cmdArgs]
@@ -347,37 +201,30 @@
   (println "You should mount with the following command:")
   (println "'sudo -E env \"PATH=$PATH\" mm mount'"))
 
-(defn unmount-mods [args]
-  (let [config (readDefaultConfig)
-        res (unmountOverlay (:overlay-name config))
-        isNoFailure (= res :ok)]
-    (if isNoFailure
-      (do
-        (println "Removing files from: " (:work-dir config))
-        (println "Removing files from: " (:upper-dir config))
-        (println "Continue? (Y/n)")
-        (when (= (read-line) "Y")
-          (shell "rm -rf" (:work-dir config))
-          (shell "rm -rf" (:upper-dir config))
-          (println "Done...")))
-      (println "Something went wrong..."))))
 
+(defn createUniqueName [def s]
+  (str def "_" (hash s)))
 
 (defn initCmd [m]
   (let [path (-> m
                  :opts
-                 :path)]
+                 :path)
+        name (createUniqueName
+              defaultOverlayName path)]
     (initialize path
                 defaultConfigFile
                 defaultConfigDir
                 defaultModFolder
                 defaultUpperDir
                 defaultWorkDir
-                defaultOverlayName)))
+                name)))
+
+(defn unmount [args]
+  (unmount-mods (readDefaultConfig)))
 
 (def table
-  [{:cmds ["mount"]   :fn mount-mods}
-   {:cmds ["unmount"] :fn unmount-mods}
+  [{:cmds ["mount"]   :fn mountMods}
+   {:cmds ["unmount"] :fn unmount}
    {:cmds ["status"]   :fn printStatus}
    {:cmds ["init"] :fn initCmd :args->opts [:path]}
    {:cmds ["install"] :fn install :args->opts [:path :priority]}
