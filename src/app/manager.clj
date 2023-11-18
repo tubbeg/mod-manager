@@ -217,8 +217,6 @@
                 defaultConfigDir
                 defaultModFolder
                 defaultLowerDir
-                defaultUpperDir
-                defaultWorkDir
                 name)))
 
 (defn unmount [args]

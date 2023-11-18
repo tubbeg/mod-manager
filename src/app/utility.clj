@@ -40,8 +40,6 @@
 (defn removeLastColon [s]
   (removeLastSymbol s ":"))
 
-(removeLastColon "sdasasda/\"//&&!I))sda:::12ur r,.r e8  32718:7d:")
-
 (defn removePrefix [prefix s]
   (s/replace-first s prefix ""))
 
@@ -65,14 +63,12 @@
                 " /path/to/script mount'")))
 
 
-(defn mountOverlay [name upper lower work m]
+(defn mountOverlay [name lower m]
   (let [merge (str "\"" m "\"")
         lowerdir (str "lowerdir="  merge ":" lower ",")
-        upperdir (str "upperdir=" upper ",")
-        work (str "workdir=" work)
-        dirs (str lowerdir upperdir work)
+        dirs (str lowerdir)
         full (str "mount -t overlay " name " -o " dirs " " merge)]
-    (println "command is:\n" full)
+    ;(println "command is:\n" full)
     (println "You are about to mount an overlay to"
              merge "with name" name "\n"  
              "\nThis requires superuser permissions\n")

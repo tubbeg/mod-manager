@@ -63,20 +63,17 @@
 
 
 
-(defn start-mt [name lower upper work merge config file]
+(defn start-mt [name lower merge config file]
   (println "Lower dir: " lower)
-  (println "Upper dir: " upper)
-  (println "Work dir: " work)
   (println "Overlay name: " name)
   (println "Destination: " merge)
+  (mkdirCmd lower) 
+  (moveFilesInPriority config)
   (let [res (mountOverlay name
-                          upper
                           lower
-                          work
                           merge)
         newConfig (assoc config :deployed true)]
     (when (= res :ok)
-      (moveFilesInPriority config)
       (writeToFile (str newConfig) file)
       (println "Done!"))))
 
@@ -87,23 +84,14 @@
                       :game-path)
         lowerdir (-> config
                      :lower-dir)
-        upperdir (-> config
-                     :upper-dir)
-        work (-> config
-                 :work-dir)
         name (-> config
                  :overlay-name)]
-    (mkdirCmd upperdir)
-    (mkdirCmd work)
-    (mkdirCmd lowerdir)
     (cond
       isMounted (println "Your overlay is already mounted!")
       (= lowerdir errorPath) (println "No mods available!")
       (not (isNilOrEmptyString lowerdir)) (start-mt
                                            name
                                            lowerdir
-                                           upperdir
-                                           work
                                            game-path
                                            config
                                            config-path)

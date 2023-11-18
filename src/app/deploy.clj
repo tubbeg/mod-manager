@@ -37,17 +37,13 @@
   (let [entries (-> config 
                     :mods 
                     :entries) 
-        work-dir (-> config 
-                     :work-dir
-                     (removeLastSlash)
-                     (str "/")) 
-        upper (-> config 
-                  :upper-dir
+        lower (-> config 
+                  :lower-dir
                   (removeLastSlash)
                   (str "/"))
         ordered (sort-by :priority entries)
         ] 
-    (copyToDir ordered upper)
+    (copyToDir ordered lower)
     ;(println "Syncing files with upper directory...")
     ;(rsyncDirCmd work-dir upper)
     ))
