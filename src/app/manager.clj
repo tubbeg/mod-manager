@@ -222,6 +222,24 @@
 (defn unmount [args]
   (unmount-mods (readDefaultConfig) defaultConfigFile))
 
+(defn disableAllMods [args]
+  (let [c (readDefaultConfig)
+        entries (-> c
+                    :mods
+                    :entries)]
+    (doseq [e entries] 
+      (println "E is" e)
+      (set-mod (:name e) false (:priority e) (readDefaultConfig)))))
+
+(defn enableAllMods [args]
+  (let [c (readDefaultConfig)
+        entries (-> c
+                    :mods
+                    :entries)]
+    (doseq [e entries]
+      (println "E is" e)
+      (set-mod (:name e) true (:priority e) (readDefaultConfig)))))
+
 (def table
   [{:cmds ["mount"]   :fn mountMods}
    {:cmds ["unmount"] :fn unmount}
@@ -230,6 +248,8 @@
    {:cmds ["install"] :fn install :args->opts [:path :priority]}
    {:cmds ["set-mod"] :fn changeModEntry :args->opts
     [:name :enable :priority :new-path]}
+   {:cmds ["disable-all"]   :fn disableAllMods}
+   {:cmds ["enable-all"]   :fn enableAllMods}
    {:cmds ["remove-mod"] :fn removeModAndFiles :args->opts [:name]}
    {:cmds ["clean"] :fn cleanDir}
    {:cmds ["help"] :fn quickHelp}
