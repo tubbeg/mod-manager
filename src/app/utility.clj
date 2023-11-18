@@ -69,15 +69,15 @@
         dirs (str lowerdir)
         full (str "mount -t overlay " name " -o " dirs " " merge)]
     ;(println "command is:\n" full)
-    (println "You are about to mount an overlay to"
+    (println "\nYou are about to mount an overlay to"
              merge "with name" name "\n"  
-             "\nThis requires superuser permissions\n")
+             "\nThis requires superuser (root) permissions\n")
     (println "Do you want to continue? (Y/n)") 
     (if (= (read-line) "Y")
       (try 
         (do 
           (shell full) 
-          (println "Done...")
+          (println "Mount completed.")
           :ok) 
         (catch Exception e
           (printErrorMessage e)
