@@ -160,9 +160,6 @@
       (set-mod mod-name enable prio
                (readDefaultConfig)))))
 
-
-
-
 (defn printStatus [args]
   (let [tabs "\t\t\t\t"
         c (readDefaultConfig)
@@ -215,8 +212,10 @@
     (initialize path
                 defaultConfigFile
                 defaultConfigDir
-                defaultModFolder
+                defaultModFolder 
                 defaultLowerDir
+                defaultUpperDir
+                defaultWorkDir
                 name)))
 
 (defn unmount [args]

@@ -63,12 +63,14 @@
                 " /path/to/script mount'")))
 
 
-(defn mountOverlay [name lower m]
+(defn mountOverlay [name lower upper work m]
   (let [merge (str "\"" m "\"")
-        lowerdir (str "lowerdir="  merge ":" lower ",")
-        dirs (str lowerdir)
+        lowerdir (str "lowerdir=" lower ",")
+        upperdir (str "upperdir="  upper ",")
+        workdir (str "workdir=" work)
+        dirs (str lowerdir upperdir workdir)
         full (str "mount -t overlay " name " -o " dirs " " merge)]
-    ;(println "command is:\n" full)
+    (println "command is:\n" full)
     (println "\nYou are about to mount an overlay to"
              merge "with name" name "\n"  
              "\nThis requires superuser (root) permissions\n")
