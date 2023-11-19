@@ -65,7 +65,7 @@
 
 (defn mountOverlay [name lower upper work m]
   (let [merge (str "\"" m "\"")
-        lowerdir (str "lowerdir=" lower ",")
+        lowerdir (str "lowerdir=" merge ",")
         upperdir (str "upperdir="  upper ",")
         workdir (str "workdir=" work)
         dirs (str lowerdir upperdir workdir)
